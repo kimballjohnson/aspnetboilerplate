@@ -147,6 +147,14 @@
     <Compile Include="Domain\Entities\Auditing\IDeletionAudited.cs" />
     <Compile Include="Domain\Entities\Auditing\IFullAudited.cs" />
     <Compile Include="Domain\Entities\Auditing\IModificationAudited.cs" />
+    <Compile Include="Domain\Uow\IActiveUnitOfWork.cs" />
+    <Compile Include="Domain\Uow\IUnitOfWorkCompleteHandle.cs" />
+    <Compile Include="Domain\Uow\ICurrentUnitOfWorkProvider.cs" />
+    <Compile Include="Domain\Uow\IUnitOfWorkManager.cs" />
+    <Compile Include="Domain\Uow\ThreadStaticCurrentUnitOfWorkProvider.cs" />
+    <Compile Include="Domain\Uow\NullUnitOfWorkCompleteHandle.cs" />
+    <Compile Include="Domain\Uow\UnitOfWorkManager.cs" />
+    <Compile Include="Reflection\AsyncHelper.cs" />
     <Compile Include="Extensions\DateTimeRangeExtensions.cs" />
     <Compile Include="Dependency\DisposableDependencyObjectWrapper.cs" />
     <Compile Include="Dependency\IConventionalRegistrationContext.cs" />
@@ -222,7 +230,6 @@
     <Compile Include="Domain\Uow\UnitOfWorkBase.cs" />
     <Compile Include="Domain\Uow\UnitOfWorkInterceptor.cs" />
     <Compile Include="Domain\Uow\UnitOfWorkRegistrar.cs" />
-    <Compile Include="Domain\Uow\UowEventBusExtensions.cs" />
     <Compile Include="Localization\LocalizableString.cs" />
     <Compile Include="Logging\LogHelper.cs" />
     <Compile Include="AbpCoreModule.cs" />
@@ -241,7 +248,6 @@
     <Compile Include="Domain\Repositories\IRepository.cs" />
     <Compile Include="Domain\Repositories\IRepositoryOfTEntity.cs" />
     <Compile Include="Domain\Uow\IUnitOfWork.cs" />
-    <Compile Include="Domain\Uow\UnitOfWorkScope.cs" />
     <Compile Include="Domain\Uow\UnitOfWorkAttribute.cs" />
     <Compile Include="Domain\Uow\UnitOfWorkHelper.cs" />
     <Compile Include="Domain\Entities\Entity.cs" />

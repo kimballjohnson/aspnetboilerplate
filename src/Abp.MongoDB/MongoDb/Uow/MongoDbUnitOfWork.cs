@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Abp.Domain.Uow;
 using MongoDB.Driver;
 
@@ -7,7 +8,7 @@ namespace Abp.MongoDb.Uow
     {
         public MongoDatabase Database { get; set; }
 
-        public override void Begin()
+        protected override void StartUow()
         {
             var client = new MongoClient("mongodb://localhost"); //TODO: Get from connection string???
             var server = client.GetServer();
@@ -19,17 +20,22 @@ namespace Abp.MongoDb.Uow
 
         }
 
-        public override void End()
+        public override Task SaveChangesAsync()
+        {
+            throw new System.NotImplementedException();
+        }
+
+        protected override void CompleteUow()
         {
 
         }
 
-        public override void Cancel()
+        protected override Task CompleteUowAsync()
         {
-
+            throw new System.NotImplementedException();
         }
 
-        public override void Dispose()
+        protected override void DisposeUow()
         {
 
         }

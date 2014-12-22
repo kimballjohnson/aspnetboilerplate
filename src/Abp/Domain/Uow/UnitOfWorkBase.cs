@@ -1,87 +1,116 @@
 using System;
-using System.Collections.Generic;
-using Abp.Collections.Extensions;
+using System.Threading.Tasks;
+using Abp.Extensions;
 
 namespace Abp.Domain.Uow
 {
     /// <summary>
-    /// Base for UnitOfWork classes.
+    /// Base for all Unit Of Work classes.
     /// </summary>
     public abstract class UnitOfWorkBase : IUnitOfWork
     {
         /// <inheritdoc/>
+        public event EventHandler Disposed;
+
+        /// <inheritdoc/>
+        public event EventHandler Completed;
+
+        /// <inheritdoc/>
+        public event EventHandler Failed;
+
+        /// <inheritdoc/>
         public bool IsTransactional { get; private set; }
-
-        private readonly List<Action> _successHandlers;
-
+        
         /// <summary>
-        /// Constructor.
+        /// Is this object disposed?
+        /// Used to prevent multiple dispose.
         /// </summary>
-        protected UnitOfWorkBase()
-        {
-            _successHandlers = new List<Action>();
-        }
+        protected bool IsDisposed { get; private set; }
+
+        private bool _isStarted;
+        private bool _isCompleted;
 
         /// <inheritdoc/>
-        public abstract void Dispose();
-
-        /// <inheritdoc/>
-        public void Initialize(bool isTransactional)
+        public void Start(bool isTransactional = true)
         {
+            if (_isStarted)
+            {
+                throw new AbpException("This unit of work has started before.");
+            }
+
+            _isStarted = true;
+
             IsTransactional = isTransactional;
+            StartUow();
         }
-
-        /// <inheritdoc/>
-        public abstract void Begin();
 
         /// <inheritdoc/>
         public abstract void SaveChanges();
 
         /// <inheritdoc/>
-        public abstract void End();
+        public abstract Task SaveChangesAsync();
 
         /// <inheritdoc/>
-        public abstract void Cancel();
-
-        /// <summary>
-        /// Add a handler that will be called if unit of work succeed.
-        /// </summary>
-        /// <param name="action">Action to be executed</param>
-        public virtual void OnSuccess(Action action)
+        public void Complete()
         {
-            _successHandlers.Add(action);
+            SetAsCompleted();
+
+            CompleteUow();
+            Completed.InvokeSafely(this);
         }
 
-        /// <summary>
-        /// Calls all success handlers.
-        /// This method must be called if and only if unit of work success.
-        /// </summary>
-        /// <exception cref="AggregateException">Throws any of handlers throws exception</exception>
-        protected void TriggerSuccessHandlers()
+        /// <inheritdoc/>
+        public async Task CompleteAsync()
         {
-            if (_successHandlers.IsNullOrEmpty())
+            SetAsCompleted();
+
+            await CompleteUowAsync();
+            Completed.InvokeSafely(this);
+        }
+
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            if (IsDisposed)
             {
                 return;
             }
 
-            var exceptions = new List<Exception>();
+            IsDisposed = true;
 
-            foreach (var successHandler in _successHandlers)
+            DisposeUow();
+
+            Disposed.InvokeSafely(this);
+        }
+
+        /// <summary>
+        /// Should be implemented by derived classes to start UOW.
+        /// </summary>
+        protected abstract void StartUow();
+
+        /// <summary>
+        /// Should be implemented by derived classes to complete UOW.
+        /// </summary>
+        protected abstract void CompleteUow();
+
+        /// <summary>
+        /// Should be implemented by derived classes to complete UOW.
+        /// </summary>
+        protected abstract Task CompleteUowAsync();
+
+        /// <summary>
+        /// Should be implemented by derived classes to dispose UOW.
+        /// </summary>
+        protected abstract void DisposeUow();
+
+        private void SetAsCompleted()
+        {
+            if (_isCompleted)
             {
-                try
-                {
-                    successHandler();
-                }
-                catch (Exception ex)
-                {
-                    exceptions.Add(ex);
-                }
+                throw new AbpException("Complete is called before!");
             }
 
-            if (exceptions.Count > 0)
-            {
-                throw new AggregateException("There are exceptions in success handlers of unit of work", exceptions);
-            }
+            _isCompleted = true;
         }
     }
 }

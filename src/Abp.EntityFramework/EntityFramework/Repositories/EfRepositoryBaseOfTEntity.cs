@@ -8,6 +8,9 @@ namespace Abp.EntityFramework.Repositories
         where TEntity : class, IEntity<int>
         where TDbContext : DbContext
     {
-
+        public EfRepositoryBase(IDbContextProvider<TDbContext> dbContextProvider)
+            : base(dbContextProvider)
+        {
+        }
     }
 }

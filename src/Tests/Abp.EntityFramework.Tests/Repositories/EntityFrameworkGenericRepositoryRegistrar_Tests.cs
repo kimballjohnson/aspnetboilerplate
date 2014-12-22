@@ -3,6 +3,7 @@ using Abp.Domain.Entities;
 using Abp.Domain.Repositories;
 using Abp.EntityFramework.Repositories;
 using Abp.Tests;
+using Castle.MicroKernel.Registration;
 using Shouldly;
 using Xunit;
 
@@ -13,6 +14,12 @@ namespace Abp.EntityFramework.Tests.Repositories
         [Fact]
         public void Should_Resolve_Generic_Repositories()
         {
+            var fakeDbContextProvider = NSubstitute.Substitute.For<IDbContextProvider<MyDbContext>>();
+
+            LocalIocManager.IocContainer.Register(
+                Component.For<IDbContextProvider<MyDbContext>>().UsingFactoryMethod(() => fakeDbContextProvider)
+                );
+
             EntityFrameworkGenericRepositoryRegistrar.RegisterForDbContext(typeof(MyDbContext), LocalIocManager);
 
             var entity1Repository = LocalIocManager.Resolve<IRepository<MyEntity1>>();

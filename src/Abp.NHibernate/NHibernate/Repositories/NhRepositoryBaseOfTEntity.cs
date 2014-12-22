@@ -9,6 +9,9 @@ namespace Abp.NHibernate.Repositories
     /// <typeparam name="TEntity">Entity type</typeparam>
     public class NhRepositoryBase<TEntity> : NhRepositoryBase<TEntity, int>, IRepository<TEntity> where TEntity : class, IEntity<int>
     {
-
+        public NhRepositoryBase(ISessionProvider sessionProvider)
+            : base(sessionProvider)
+        {
+        }
     }
 }

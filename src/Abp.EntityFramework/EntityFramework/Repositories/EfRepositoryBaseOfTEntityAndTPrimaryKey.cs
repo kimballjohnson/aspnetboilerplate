@@ -3,30 +3,41 @@ using System.Collections.Generic;
 using System.Data.Entity;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading.Tasks;
 using Abp.Domain.Entities;
 using Abp.Domain.Repositories;
-using Abp.Domain.Uow;
 
 namespace Abp.EntityFramework.Repositories
 {
+    /// <summary>
+    /// Implements IRepository for Entity Framework.
+    /// </summary>
+    /// <typeparam name="TDbContext">DbContext which contains <see cref="TEntity"/>.</typeparam>
+    /// <typeparam name="TEntity">Type of the Entity for this repository</typeparam>
+    /// <typeparam name="TPrimaryKey">Primary key of the entity</typeparam>
     public class EfRepositoryBase<TDbContext, TEntity, TPrimaryKey> : IRepository<TEntity, TPrimaryKey>
         where TEntity : class, IEntity<TPrimaryKey>
         where TDbContext : DbContext
     {
-        public virtual IDbContextProvider<TDbContext> DbContextProvider { private get; set; }
+        /// <summary>
+        /// Gets EF DbContext object.
+        /// </summary>
+        protected virtual TDbContext Context { get { return _dbContextProvider.DbContext; } }
 
-        protected virtual TDbContext Context { get { return DbContextProvider.GetDbContext(); } }
-
+        /// <summary>
+        /// Gets DbSet for given entity.
+        /// </summary>
         protected virtual DbSet<TEntity> Table { get { return Context.Set<TEntity>(); } }
-        
-        public EfRepositoryBase()
-        {
-            DbContextProvider = DefaultContextProvider<TDbContext>.Instance;
-        }
 
-        public EfRepositoryBase(Func<TDbContext> dbContextFactory)
+        private readonly IDbContextProvider<TDbContext> _dbContextProvider;
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="dbContextProvider"></param>
+        public EfRepositoryBase(IDbContextProvider<TDbContext> dbContextProvider)
         {
-            DbContextProvider = new FactoryContextProvider<TDbContext>(dbContextFactory);
+            _dbContextProvider = dbContextProvider;
         }
 
         public virtual IQueryable<TEntity> GetAll()
@@ -39,9 +50,19 @@ namespace Abp.EntityFramework.Repositories
             return GetAll().ToList();
         }
 
+        public virtual async Task<List<TEntity>> GetAllListAsync()
+        {
+            return await GetAll().ToListAsync();
+        }
+
         public virtual List<TEntity> GetAllList(Expression<Func<TEntity, bool>> predicate)
         {
             return GetAll().Where(predicate).ToList();
+        }
+
+        public virtual async Task<List<TEntity>> GetAllListAsync(Expression<Func<TEntity, bool>> predicate)
+        {
+            return await GetAll().Where(predicate).ToListAsync();
         }
 
         public virtual T Query<T>(Func<IQueryable<TEntity>, T> queryMethod)
@@ -60,9 +81,25 @@ namespace Abp.EntityFramework.Repositories
             return entity;
         }
 
+        public virtual async Task<TEntity> GetAsync(TPrimaryKey id)
+        {
+            var entity = await FirstOrDefaultAsync(id);
+            if (entity == null)
+            {
+                throw new AbpException("There is no such an entity with given primary key. Entity type: " + typeof(TEntity).FullName + ", primary key: " + id);
+            }
+
+            return entity;
+        }
+
         public virtual TEntity Single(Expression<Func<TEntity, bool>> predicate)
         {
             return GetAll().Single(predicate);
+        }
+
+        public virtual async Task<TEntity> SingleAsync(Expression<Func<TEntity, bool>> predicate)
+        {
+            return await GetAll().SingleAsync(predicate);
         }
 
         public virtual TEntity FirstOrDefault(TPrimaryKey id)
@@ -71,9 +108,20 @@ namespace Abp.EntityFramework.Repositories
                 .FirstOrDefault(CreateEqualityExpression(id));
         }
 
+        public virtual async Task<TEntity> FirstOrDefaultAsync(TPrimaryKey id)
+        {
+            return await GetAll()
+                .FirstOrDefaultAsync(CreateEqualityExpression(id));
+        }
+
         public virtual TEntity FirstOrDefault(Expression<Func<TEntity, bool>> predicate)
         {
             return GetAll().FirstOrDefault(predicate);
+        }
+
+        public virtual async Task<TEntity> FirstOrDefaultAsync(Expression<Func<TEntity, bool>> predicate)
+        {
+            return await GetAll().FirstOrDefaultAsync(predicate);
         }
 
         public virtual TEntity Load(TPrimaryKey id)
@@ -86,32 +134,68 @@ namespace Abp.EntityFramework.Repositories
             return Table.Add(entity);
         }
 
-        public TPrimaryKey InsertAndGetId(TEntity entity)
+        public virtual Task<TEntity> InsertAsync(TEntity entity)
+        {
+            return Task.FromResult(Table.Add(entity));
+        }
+
+        public virtual TPrimaryKey InsertAndGetId(TEntity entity)
         {
             entity = Insert(entity);
-            
+
             if (EqualityComparer<TPrimaryKey>.Default.Equals(entity.Id, default(TPrimaryKey)))
             {
-                UnitOfWorkScope.Current.SaveChanges();
+                Context.SaveChanges();
             }
 
             return entity.Id;
         }
 
-        public TEntity InsertOrUpdate(TEntity entity)
+        public virtual async Task<TPrimaryKey> InsertAndGetIdAsync(TEntity entity)
+        {
+            entity = Insert(entity);
+
+            if (EqualityComparer<TPrimaryKey>.Default.Equals(entity.Id, default(TPrimaryKey)))
+            {
+                await Context.SaveChangesAsync();
+            }
+
+            return entity.Id;
+        }
+
+        public virtual TEntity InsertOrUpdate(TEntity entity)
         {
             return EqualityComparer<TPrimaryKey>.Default.Equals(entity.Id, default(TPrimaryKey))
                 ? Insert(entity)
                 : Update(entity);
         }
 
-        public TPrimaryKey InsertOrUpdateAndGetId(TEntity entity)
+        public virtual async Task<TEntity> InsertOrUpdateAsync(TEntity entity)
+        {
+            return EqualityComparer<TPrimaryKey>.Default.Equals(entity.Id, default(TPrimaryKey))
+                ? await InsertAsync(entity)
+                : await UpdateAsync(entity);
+        }
+
+        public virtual TPrimaryKey InsertOrUpdateAndGetId(TEntity entity)
         {
             entity = InsertOrUpdate(entity);
 
             if (EqualityComparer<TPrimaryKey>.Default.Equals(entity.Id, default(TPrimaryKey)))
             {
-                UnitOfWorkScope.Current.SaveChanges();
+                Context.SaveChanges();
+            }
+
+            return entity.Id;
+        }
+
+        public virtual async Task<TPrimaryKey> InsertOrUpdateAndGetIdAsync(TEntity entity)
+        {
+            entity = InsertOrUpdate(entity);
+
+            if (EqualityComparer<TPrimaryKey>.Default.Equals(entity.Id, default(TPrimaryKey)))
+            {
+                await Context.SaveChangesAsync();
             }
 
             return entity.Id;
@@ -124,6 +208,13 @@ namespace Abp.EntityFramework.Repositories
             return entity;
         }
 
+        public virtual Task<TEntity> UpdateAsync(TEntity entity)
+        {
+            Table.Attach(entity);
+            Context.Entry(entity).State = EntityState.Modified;
+            return Task.FromResult(entity);
+        }
+
         public virtual void Delete(TEntity entity)
         {
             if (entity is ISoftDelete)
@@ -132,8 +223,13 @@ namespace Abp.EntityFramework.Repositories
             }
             else
             {
-                Table.Remove(entity);                
+                Table.Remove(entity);
             }
+        }
+
+        public virtual async Task DeleteAsync(TEntity entity)
+        {
+            Delete(entity);
         }
 
         public virtual void Delete(TPrimaryKey id)
@@ -151,6 +247,11 @@ namespace Abp.EntityFramework.Repositories
             Delete(entity);
         }
 
+        public virtual async Task DeleteAsync(TPrimaryKey id)
+        {
+            Delete(id);
+        }
+
         public virtual void Delete(Expression<Func<TEntity, bool>> predicate)
         {
             foreach (var entity in Table.Where(predicate).ToList())
@@ -158,10 +259,20 @@ namespace Abp.EntityFramework.Repositories
                 Delete(entity);
             }
         }
-        
+
+        public virtual async Task DeleteAsync(Expression<Func<TEntity, bool>> predicate)
+        {
+            Delete(predicate);
+        }
+
         public virtual int Count()
         {
             return GetAll().Count();
+        }
+
+        public virtual async Task<int> CountAsync()
+        {
+            return await GetAll().CountAsync();
         }
 
         public virtual int Count(Expression<Func<TEntity, bool>> predicate)
@@ -169,14 +280,29 @@ namespace Abp.EntityFramework.Repositories
             return GetAll().Where(predicate).Count();
         }
 
+        public virtual async Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate)
+        {
+            return await GetAll().Where(predicate).CountAsync();
+        }
+
         public virtual long LongCount()
         {
             return GetAll().LongCount();
         }
 
+        public virtual async Task<long> LongCountAsync()
+        {
+            return await GetAll().LongCountAsync();
+        }
+
         public virtual long LongCount(Expression<Func<TEntity, bool>> predicate)
         {
             return GetAll().Where(predicate).LongCount();
+        }
+
+        public virtual async Task<long> LongCountAsync(Expression<Func<TEntity, bool>> predicate)
+        {
+            return await GetAll().Where(predicate).LongCountAsync();
         }
 
         private static Expression<Func<TEntity, bool>> CreateEqualityExpression(TPrimaryKey id)
